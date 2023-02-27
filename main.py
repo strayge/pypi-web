@@ -86,7 +86,7 @@ async def search(query: str | None = None, limit: int = 50, order: str = 'downlo
         latest_upload = datetime.strptime(metadata['upload_time'][:10], '%Y-%m-%d').date()
         packages.append({
             'name': name,
-            'summary': metadata.get('summary', ''),
+            'summary': metadata.get('summary') or '',
             'version': metadata.get('version', ''),
             'url': metadata.get('project_url'),
             'stars': github.get('stargazerCount', 0),

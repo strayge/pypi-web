@@ -16,6 +16,7 @@ from fastapi.templating import Jinja2Templates
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")
 logger = logging.getLogger('web')
+DATA = None
 
 
 def _read_file(filename: str) -> dict:
@@ -44,9 +45,6 @@ def combine_data() -> dict:
     return data
 
 
-DATA = combine_data()
-
-
 @app.get("/")
 async def root() -> Response:
     return templates.TemplateResponse('index.html', {"request": {}})
@@ -54,6 +52,10 @@ async def root() -> Response:
 
 @app.get("/search/")
 async def search(query: str | None = None, limit: int = 5, order: str = 'downloads') -> Response:
+    global DATA
+    if DATA is None:
+        DATA = combine_data()
+
     GLOBAL_LIMIT = 2000
     if order not in ('downloads', 'stars', 'forks', 'latest_upload'):
         order = 'downloads'

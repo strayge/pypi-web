@@ -51,7 +51,7 @@ async def root() -> Response:
 
 
 @app.get("/search/")
-async def search(query: str | None = None, limit: int = 5, order: str = 'downloads') -> Response:
+async def search(query: str | None = None, limit: int = 50, order: str = 'downloads') -> Response:
     global DATA
     if DATA is None:
         DATA = combine_data()

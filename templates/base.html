@@ -64,15 +64,11 @@
         <form id="search-form" action="/search/" method="get">
           <input id="search-input" type="text" placeholder="Project name" name="query" value="{{ query }}">
           <select class="search-input-limit" name="limit">
-              {% if limit %}
-              <option value="{{ limit }}" selected disabled>{{ limit }}</option>
-              {% endif %}
-              <option value="50">50</option>
-              <option value="100">100</option>
-              <option value="500">500</option>
-              <option value="1000">1000</option>
-              <option value="2000">2000</option>
+              {% for value in [50, 100, 500, 1000, 5000] %}
+              <option {% if value == limit %}selected{% endif %} value="{{ value }}">{{ value }}</option>
+              {% endfor %}
           </select>
+          <input type="hidden" name="order" value="{{ order }}" />
           <button id="search-button" type="submit" value="Search">🔎</button>
         </form>
       </div>

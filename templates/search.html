@@ -8,10 +8,9 @@
                     <input type="hidden" name="query" value="{{ query }}" />
                     <input type="hidden" name="limit" value="{{ limit }}" />
                     <select id="search-order-select" name="order" onchange="this.form.submit()">
-                        <option value="{{ order }}" selected disabled>{{ order }}</option>
-                        <option value="downloads">downloads</option>
-                        <option value="stars">stars</option>
-                        <option value="forks">forks</option>
+                        {% for value in ['downloads', 'stars', 'forks'] %}
+                        <option {% if value == order %}selected{% endif %} value="{{ value }}">{{ value }}</option>
+                        {% endfor %}
                     </select>
                 </form>
             </span>

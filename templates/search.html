@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+{% block content %}
+    <div id="search-list">
+        <div id="search-header">
+            <span>Showed {{ showed }} / {{ total }}</span>
+            <span>
+                <form method="get">
+                    <input type="hidden" name="query" value="{{ query }}" />
+                    <input type="hidden" name="limit" value="{{ limit }}" />
+                    <select id="search-order-select" name="order" onchange="this.form.submit()">
+                        <option value="{{ order }}" selected disabled>{{ order }}</option>
+                        <option value="downloads">downloads</option>
+                        <option value="stars">stars</option>
+                        <option value="forks">forks</option>
+                    </select>
+                </form>
+            </span>
+        </div>
+        {% for package in packages %}
+            <div id="search-item">
+                <div id="search-line1">
+
+                    <span class="bold">
+                        <a href="https://pypi.org/project/{{ package.name }}/">{{ package.name }} {{package.version }}</a>
+                    </span>
+
+                    <span class="float-right">
+                        {{ package.latest_upload }}
+                    </span>
+
+                    <span class="spaced float-right">
+                        <a class="black" href="https://pypistats.org/packages/{{ package.name }}">
+                            <span id="icon100">⬇</span> {{ package.downloads }}
+                        </a>
+                    </span>
+
+                    {% if package.github %}
+                    <span class="spaced float-right">
+                        <a class="black" href="{{ package.github }}">
+                            <span id="icon150">⋔</span> {{ package.forks }}
+                        </a>
+                    </span>
+
+                    <span class="spaced float-right">
+                        <a class="black" href="{{ package.github }}">
+                            <span id="icon100">★</span> {{ package.stars }}
+                        </a>
+                    </span>
+                    {% endif %}
+
+                </div>
+                <div id="search-line2">
+                    {{ package.summary }}
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+{% endblock %}
+
+{% block css %}
+    body {
+
+    }
+    a {
+        text-decoration: none;
+    }
+    #icon150 {
+        font-size: 1.5rem;
+        line-height: 0px;
+    }
+    #search-list {
+        max-width: 900px;
+        margin-right: auto;
+        margin-left: auto;
+    }
+    #search-item {
+        border: 1px solid #d3d3d3;
+        box-shadow: 1px 1px 2px 1px rgb(0 0 0 / 5%);
+        direction: ltr;
+        display: block;
+        margin: 0 0 20px;
+        padding: 15px 20px 15px 75px;
+    }
+    #search-line1 {
+    }
+    #search-line2 {
+        padding-top: 2px;
+    }
+    .float-right {
+        float: right;
+    }
+    .bold {
+        font-weight: bold;
+    }
+    .black {
+        color: black;
+    }
+    .spaced {
+        margin-right: 20px;
+        min-width: 60px;
+    }
+    #search-header {
+        margin-top: 20px;
+        margin-bottom: 20px;
+        justify-content: space-between;
+        display: flex;
+        align-items: center;
+    }
+    #search-order-select {
+        height: 40px;
+        padding: 0 10px;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+        font-size: 1.2rem;
+    }
+{% endblock %}

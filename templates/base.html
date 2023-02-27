@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>PyPI Web</title>
+    <style>
+    {% block css %}{% endblock %}
+        #search-form {
+            margin: 0 auto;
+            padding: 0 20px;
+            width: 700px;
+            padding: 20px 0;
+        }
+        #search-input {
+            width: 500px;
+            height: 40px;
+            padding: 0 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            font-size: 1.2rem;
+        }
+        .search-input-limit {
+            width: 90px;
+            height: 40px;
+            padding: 0 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            font-size: 1.2rem;
+        }
+        #search-button {
+            width: 50px;
+            height: 40px;
+            padding: 0 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            font-size: 1.2rem;
+        }
+        header {
+            background-color: #0073b7;
+            background-position: 0 50%;
+        }
+        #header {
+          display: flex;
+        }
+        body {
+            margin: 0;
+            font-family: Source Sans Pro,Helvetica,arial,sans-serif;
+            font-size: 1rem;
+            font-weight: 400;
+            line-height: 1.4;
+            background-color: #fdfdfd;
+        }
+        #logo {
+          padding: 20px 0 20px 30px;
+          font-size: 1.5em;
+        }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div id="header">
+        <div id="logo">
+          <a href="/">PyPI Web</a>
+        </div>
+        <form id="search-form" action="/search/" method="get">
+          <input id="search-input" type="text" placeholder="Project name" name="query" value="{{ query }}">
+          <select class="search-input-limit" name="limit">
+              {% if limit %}
+              <option value="{{ limit }}" selected disabled>{{ limit }}</option>
+              {% endif %}
+              <option value="50">50</option>
+              <option value="100">100</option>
+              <option value="500">500</option>
+              <option value="1000">1000</option>
+              <option value="2000">2000</option>
+          </select>
+          <button id="search-button" type="submit" value="Search">🔎</button>
+        </form>
+      </div>
+    </header>
+
+    {% block content %}{% endblock %}
+  </body>
+</html>

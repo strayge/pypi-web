@@ -122,14 +122,15 @@ def init_data() -> None:
             github_timestamp=bindparam('timestamp'),
         ).compile(),
     )
-    for data in _read_json_by_line(os.path.join('data', 'github_lines.json')):
-        data.setdefault('stargazerCount', 0)
-        data.setdefault('forkCount', 0)
-        data.setdefault('url', None)
-        raw_connection.execute(update_sql, data)
-    raw_connection.commit()
-    t4 = time()
-    print(f'insert github: {t4 - t3:.2f}s')
+    if os.path.exists(os.path.join('data', 'github_lines.json')):
+        for data in _read_json_by_line(os.path.join('data', 'github_lines.json')):
+            data.setdefault('stargazerCount', 0)
+            data.setdefault('forkCount', 0)
+            data.setdefault('url', None)
+            raw_connection.execute(update_sql, data)
+        raw_connection.commit()
+        t4 = time()
+        print(f'insert github: {t4 - t3:.2f}s')
     print('Initializing done.')
 
 
@@ -232,6 +233,7 @@ async def get_github_info(packages: list[Package]) -> list[Package]:
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--reload', action='store_true')
+    parser.add_argument('--ip', type=str, default='127.0.0.1')
     parser.add_argument('--port', type=int, default=8080)
     args = parser.parse_args()
 
@@ -279,6 +281,7 @@ if __name__ == '__main__':
 
     uvicorn.run(
         'main:app',
+        host=args.ip,
         port=args.port,
         reload=args.reload,
         env_file='.env',

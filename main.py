@@ -6,43 +6,131 @@ import os
 import re
 from datetime import datetime
 from time import time
+from typing import Iterable, Optional
 
 import httpx
 import uvicorn
 from fastapi import FastAPI, Response
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
+from sqlalchemy import bindparam, create_engine, insert, select, update
+from sqlalchemy.orm import DeclarativeBase, Mapped, MappedAsDataclass, Session, mapped_column
 
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")
 logger = logging.getLogger('web')
-DATA = None
+db = create_engine("sqlite:///data/data.db")
 
 
-def _read_file(filename: str) -> dict:
-    if not os.path.exists(filename):
-        return {}
+class BaseModel(MappedAsDataclass, DeclarativeBase):
+    pass
+
+
+class Package(BaseModel):
+    __tablename__ = 'packages'
+
+    name: Mapped[str] = mapped_column(primary_key=True)
+    name_lower: Mapped[str]
+    version: Mapped[str]
+    upload_time: Mapped[int]
+    home_page: Mapped[str]
+    summary: Mapped[str]
+    summary_lower: Mapped[str]
+    downloads: Mapped[int]
+    stars: Mapped[int]
+    forks: Mapped[int]
+    github_owner: Mapped[Optional[str]]
+    github_name: Mapped[Optional[str]]
+    github_url: Mapped[Optional[str]]
+    github_timestamp: Mapped[int]
+
+
+def _read_json_by_line(filename: str) -> Iterable[dict]:
     with open(filename, 'r') as f:
-        return json.load(f)  # type: ignore[no-any-return]
+        for line in f:
+            if not line:
+                continue
+            yield json.loads(line)  # type: ignore[no-any-return]
 
 
-def _write_file(filename: str, data: dict) -> None:
-    with open(filename, 'w') as f:
-        json.dump(data, f)
+def init_data() -> None:
+    def get_github_url(url: str, urls_with_names: list[str]) -> tuple[str, str] | None:
+        urls = []
+        if url:
+            urls.append(url)
+        for url_with_name in urls_with_names:
+            url = url_with_name.split(',', 1)[1].strip()
+            urls.append(url)
+        for url in urls:
+            if m := re.match(r'https:\/\/github.com\/([\w\.-]+)\/([\w\.-]+)\/?', url):
+                return m.group(1), m.group(2)
+        return None
 
+    if os.path.exists(os.path.join('data', 'data.db')):
+        return
 
-def combine_data() -> dict:
-    downloads = _read_file(os.path.join('data', 'downloads.json'))
-    metadata = _read_file(os.path.join('data', 'metadata.json'))
-    github = _read_file(os.path.join('data', 'github.json'))
-    data = {}
-    for name, meta in metadata.items():
-        data[name] = {
-            'metadata': meta,
-            'github': github.get(name, {}),
-            'downloads': downloads.get(name, {}),
-        }
-    return data
+    print('Initializing data...')
+    BaseModel.metadata.create_all(db)
+
+    raw_connection = db.raw_connection()
+    insert_sql = str(insert(Package).compile())
+    t1 = time()
+    for data in _read_json_by_line(os.path.join('data', 'metadata_lines.json')):
+        name = data['name']
+        summary = data.get('summary') or ''
+        timestamp = datetime.strptime(data['upload_time'][:10], '%Y-%m-%d').timestamp()
+        homepage = data.get('home_page') or ''
+        urls_with_names = data.get('project_urls') or []
+        github_names = get_github_url(homepage, urls_with_names)
+        package = dict(
+            name=name,
+            name_lower=name.lower(),
+            version=data['version'],
+            upload_time=int(timestamp),
+            home_page=homepage,
+            summary=summary,
+            summary_lower=summary.lower(),
+            downloads=0,
+            stars=0,
+            forks=0,
+            github_owner=github_names[0] if github_names else None,
+            github_name=github_names[1] if github_names else None,
+            github_url='',
+            github_timestamp=0,
+        )
+        raw_connection.execute(insert_sql, package)
+    raw_connection.commit()
+    t2 = time()
+    print(f'insert metadata: {t2 - t1:.2f}s')
+
+    update_sql = str(
+        update(Package).where(Package.name == bindparam('name')).values(
+            downloads=bindparam('download_count'),
+        ).compile(),
+    )
+    for data in _read_json_by_line(os.path.join('data', 'downloads_lines.json')):
+        raw_connection.execute(update_sql, data)
+    raw_connection.commit()
+    t3 = time()
+    print(f'insert downloads: {t3 - t2:.2f}s')
+
+    update_sql = str(
+        update(Package).where(Package.name == bindparam('name')).values(
+            stars=bindparam('stargazerCount'),
+            forks=bindparam('forkCount'),
+            github_url=bindparam('url'),
+            github_timestamp=bindparam('timestamp'),
+        ).compile(),
+    )
+    for data in _read_json_by_line(os.path.join('data', 'github_lines.json')):
+        data.setdefault('stargazerCount', 0)
+        data.setdefault('forkCount', 0)
+        data.setdefault('url', None)
+        raw_connection.execute(update_sql, data)
+    raw_connection.commit()
+    t4 = time()
+    print(f'insert github: {t4 - t3:.2f}s')
+    print('Initializing done.')
 
 
 @app.get("/")
@@ -52,99 +140,56 @@ async def root() -> Response:
 
 @app.get("/search/")
 async def search(query: str | None = None, limit: int = 50, order: str = 'downloads') -> Response:
-    global DATA
-    if DATA is None:
-        DATA = combine_data()
-
     GLOBAL_LIMIT = 2000
     if order not in ('downloads', 'stars', 'forks', 'latest_upload'):
         order = 'downloads'
     if not query or not query.strip():
         return RedirectResponse(url='/', status_code=302)
-    found_name_start = set()
-    found_name = set()
-    found_summary = set()
-    for name, data in DATA.items():
-        if name.startswith(query):
-            found_name_start.add(name)
-        elif query in name:
-            found_name.add(name)
-        elif query.lower() in (data['metadata']['summary'] or '').lower():
-            found_summary.add(name)
-    names = list(found_name_start) + list(found_name) + list(found_summary)
-    total_count = len(names)
     limit = min(limit, GLOBAL_LIMIT)
-    names = names[:limit]
 
-    await update_github_info(names)
+    sql = select(Package).where(
+        Package.name_lower.like(f'%{query.lower()}%')
+        | Package.summary_lower.like(f'%{query.lower()}%'),
+    ).order_by(getattr(Package, order).desc())
 
-    packages = []
-    for name in names:
-        metadata = DATA[name]['metadata']
-        github = DATA[name]['github'] or {}
-        downloads = DATA[name]['downloads'] or {}
-        latest_upload = datetime.strptime(metadata['upload_time'][:10], '%Y-%m-%d').date()
-        packages.append({
-            'name': name,
-            'summary': metadata.get('summary') or '',
-            'version': metadata.get('version', ''),
-            'url': metadata.get('project_url'),
-            'stars': github.get('stargazerCount', 0),
-            'forks': github.get('forkCount', 0),
-            'github': github.get('url'),
-            'latest_upload': latest_upload,
-            'downloads': downloads.get('download_count', 0),
-        })
+    with Session(db) as session:
+        packages = session.scalars(sql.limit(GLOBAL_LIMIT)).all()
+        total = len(packages)
+        if await update_github_info(packages):
+            packages = session.scalars(sql.limit(limit)).all()
 
-    packages = sorted(packages, key=lambda x: x.get(order, ''), reverse=True)
-
+    packages = packages[:limit]
     return templates.TemplateResponse('search.html', {
         'request': {},
         'packages': packages,
-        'showed': len(names),
-        'total': total_count,
-        'query': query or '',
+        'showed': len(packages),
+        'total': total,
+        'query': query,
         'limit': limit,
         'order': order,
     })
 
 
-async def update_github_info(names: list[str]) -> None:
-    def get_github_url(name: str) -> tuple[str, str] | None:
-        metadata = DATA[name]['metadata']
-        urls = []
-        for keyword in ('home_page', 'package_url', 'project_url'):
-            if metadata.get(keyword):
-                urls.append(metadata[keyword])
-        project_urls_list = metadata.get('project_urls') or []
-        for url_with_name in project_urls_list:
-            url = url_with_name.split(',', 1)[1].strip()
-            urls.append(url)
-        for url in urls:
-            if m := re.match(r'https:\/\/github.com\/([\w\.-]+)\/([\w\.-]+)\/?', url):
-                return m.group(1), m.group(2)
-        return None
-
-    github_data = _read_file(os.path.join('data', 'github.json'))
-    github_requests = {}
-    for name in names:
-        if name in github_data:
+async def update_github_info(packages: list[Package]) -> bool:
+    github_requests = []
+    for package in packages:
+        if package.github_url or package.github_timestamp:
             continue
-        github_url = get_github_url(name)
-        if not github_url:
+        if not package.github_owner or not package.github_name:
             continue
-        github_requests[name] = github_url
-    if github_requests:
-        github_results = await get_github_info(github_requests)
-        for name, github_result in github_results.items():
-            github_data[name] = github_result
-            DATA[name]['github'] = github_result
-        _write_file(os.path.join('data', 'github.json'), github_data)
+        github_requests.append(package)
+    if not github_requests:
+        return False
+    packages = await get_github_info(packages)
+    with Session(db) as session:
+        session.bulk_save_objects(packages)
+        session.commit()
+    return True
 
 
-async def get_github_info(repos: dict[str, tuple[str, str]]) -> dict[str, dict]:
+async def get_github_info(packages: list[Package]) -> list[Package]:
     """Get info about github repos via GraphQL endpoint."""
-    logger.info(f'github call: {len(repos)}')
+    logger.info(f'github call: {len(packages)}')
     token = os.environ.get('GITHUB_TOKEN')
     github_api_url = 'https://api.github.com/graphql'
     query_part_template = """
@@ -155,10 +200,15 @@ async def get_github_info(repos: dict[str, tuple[str, str]]) -> dict[str, dict]:
         }}
     """
     query_parts = []
-    for i, name in enumerate(repos.keys()):
-        owner, repo_name = repos[name]
+    for i, package in enumerate(packages):
         key = f'r{i}'
-        query_parts.append(query_part_template.format(key=key, owner=owner, name=repo_name).strip())
+        query_parts.append(
+            query_part_template.format(
+                key=key,
+                owner=package.github_owner,
+                name=package.github_name,
+            ),
+        )
     query = '{' + ',\n'.join(query_parts) + '}'
 
     request = await httpx.AsyncClient().post(
@@ -169,12 +219,14 @@ async def get_github_info(repos: dict[str, tuple[str, str]]) -> dict[str, dict]:
     assert request.status_code == 200, request.text
     assert 'data' in request.json(), f'resp: {request.json()}, query: {query}'
     response = request.json()
-    result = {}
-    for i, name in enumerate(repos.keys()):
+    for i, package in enumerate(packages):
         key = f'r{i}'
-        result[name] = response['data'].get(key) or {}
-        result[name]['timestamp'] = int(time())
-    return result
+        github_result = response['data'].get(key) or {}
+        package.github_timestamp = int(time())
+        package.github_url = github_result.get('url')
+        package.forks = github_result.get('forkCount') or 0
+        package.stars = github_result.get('stargazerCount') or 0
+    return packages
 
 
 if __name__ == '__main__':
@@ -222,6 +274,8 @@ if __name__ == '__main__':
             },
         },
     }
+
+    init_data()
 
     uvicorn.run(
         'main:app',

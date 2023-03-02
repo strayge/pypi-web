@@ -4,15 +4,9 @@ import os
 from base64 import b64decode
 from datetime import datetime
 
-import httpx
 from dotenv import load_dotenv
 from google.cloud import bigquery
 from google.oauth2.service_account import Credentials
-
-
-def _write_file(filename: str, data: dict) -> None:
-    with open(filename, 'w') as f:
-        json.dump(data, f)
 
 
 def _backup(filename: str) -> None:
@@ -33,14 +27,16 @@ def _get_data_from_big_query(query: str, filename: str) -> None:
     billed = query_job.total_bytes_billed or 0
     print(f'Processed {processed // 1024 // 1024} MB, billed {billed // 1024 // 1024} MB')
     print('Reading results...')
-    data = {}
-    for row in rows:
-        row_dict = dict(row)
-        for key, value in row_dict.items():
-            if isinstance(value, datetime):
-                row_dict[key] = str(value)
-        data[row_dict['name']] = row_dict
-    _write_file(filename, data)
+    with open(filename, 'w') as f:
+        for row in rows:
+            row_dict = dict(row)
+            # convent non-serializable objects to string
+            for key, value in row_dict.items():
+                if isinstance(value, datetime):
+                    row_dict[key] = str(value)
+            # add key to each dict
+            row_dict['name'] = row_dict
+            f.write(json.dumps(row_dict) + '\n')
 
 
 def update_pypi_metadata() -> None:
@@ -62,7 +58,7 @@ def update_pypi_metadata() -> None:
     GROUP BY
         name
     """
-    filename = os.path.join('data', 'metadata.json')
+    filename = os.path.join('data', 'metadata_lines.json')
     print('Updating PyPI metadata...')
     _get_data_from_big_query(QUERY, filename)
 
@@ -85,23 +81,9 @@ def update_pypi_downloads() -> None:
         ORDER BY
             name ASC
     """
-    filename = os.path.join('data', 'downloads.json')
+    filename = os.path.join('data', 'downloads_lines.json')
     print('Updating PyPI downloads...')
     _get_data_from_big_query(QUERY, filename)
-
-
-def update_pypi_packages() -> None:
-    """Update the packages.json file."""
-    filename = os.path.join('data', 'packages.json')
-    _backup(filename)
-    print('Updating PyPI packages list...')
-    request = httpx.get(
-        'https://pypi.org/simple/',
-        headers={'Accept': 'application/vnd.pypi.simple.v1+json'},
-    )
-    assert request.status_code == 200, request.text
-    data = request.json()
-    _write_file(filename, data)
 
 
 def main() -> None:

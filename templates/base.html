@@ -64,7 +64,7 @@
         <form id="search-form" action="/search/" method="get">
           <input id="search-input" type="text" placeholder="Project name" name="query" value="{{ query }}">
           <select class="search-input-limit" name="limit">
-              {% for value in [50, 100, 500, 1000, 5000] %}
+              {% for value in [50, 100, 500, 1000, 2000] %}
               <option {% if value == limit %}selected{% endif %} value="{{ value }}">{{ value }}</option>
               {% endfor %}
           </select>

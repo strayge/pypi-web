@@ -95,6 +95,7 @@ def _hash_password(password: str) -> bytes:
 
 def encode_token() -> None:
     """Encode provided token with user password."""
+    import readline  # noqa: F401 # somehow this import lift off 1024 limit on input() calls
     secret_token_base64 = input('Enter base64 encoded token for BigQuery:').strip()
     secret_token = b64decode(secret_token_base64)
     password = getpass('Enter new password for token:')

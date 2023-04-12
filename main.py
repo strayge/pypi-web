@@ -19,7 +19,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, MappedAsDataclass, Session, 
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")
 logger = logging.getLogger('web')
-db = create_engine("sqlite:///data/data.db")
+db = create_engine("sqlite:///data/data.sqlite")
 
 
 class BaseModel(MappedAsDataclass, DeclarativeBase):
@@ -66,7 +66,7 @@ def init_data() -> None:
                 return m.group(1), m.group(2)
         return None
 
-    if os.path.exists(os.path.join('data', 'data.db')):
+    if os.path.exists(os.path.join('data', 'data.sqlite')):
         return
 
     print('Initializing data...')

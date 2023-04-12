@@ -4,6 +4,7 @@ import logging
 import logging.config
 import os
 import re
+import sqlite3
 from datetime import datetime
 from time import time
 from typing import Iterable, Optional
@@ -70,9 +71,20 @@ def init_data() -> None:
         return
 
     print('Initializing data...')
-    BaseModel.metadata.create_all(db)
 
-    raw_connection = db.raw_connection()
+    old_packages: dict[str, Package] = {}
+    if os.path.exists(os.path.join('data', 'data.sqlite.bak')):
+        print('Reading github info from backup db...')
+        db_backup = create_engine("sqlite:///data/data.sqlite.bak")
+        with Session(db_backup) as session:
+            packages = session.execute(select(Package).where(Package.github_timestamp > 0))
+            for old_db_package in packages.scalars().all():
+                old_packages[old_db_package.name] = old_db_package
+
+    print('Creating new db...')
+
+    BaseModel.metadata.create_all(db)
+    raw_connection: sqlite3.Connection = db.raw_connection()  # type: ignore
     insert_sql = str(insert(Package).compile())
     t1 = time()
     for data in _read_json_by_line(os.path.join('data', 'metadata_lines.json')):
@@ -82,6 +94,7 @@ def init_data() -> None:
         homepage = data.get('home_page') or ''
         urls_with_names = data.get('project_urls') or []
         github_names = get_github_url(homepage, urls_with_names)
+        old_package: Package | None = old_packages.get(name)
         package = dict(
             name=name,
             name_lower=name.lower(),
@@ -91,12 +104,12 @@ def init_data() -> None:
             summary=summary,
             summary_lower=summary.lower(),
             downloads=0,
-            stars=0,
-            forks=0,
+            stars=old_package.stars if old_package else 0,
+            forks=old_package.forks if old_package else 0,
             github_owner=github_names[0] if github_names else None,
             github_name=github_names[1] if github_names else None,
-            github_url='',
-            github_timestamp=0,
+            github_url=old_package.github_url if old_package else '',
+            github_timestamp=old_package.github_timestamp if old_package else 0,
         )
         raw_connection.execute(insert_sql, package)
     raw_connection.commit()

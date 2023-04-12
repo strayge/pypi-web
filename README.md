@@ -15,8 +15,10 @@ Plus sorting by this fields.
 `.env` file is used to configure the application. The following variables are used:
 
 * GITHUB_TOKEN - legacy Github token to access GraphQL API
-* QUERY_KEY - Google Service Account key (JSON with base64 encoding) to access Google BigQuery  
+* BIG_QUERY_TOKEN - encrypted Google Service Account key (JSON with base64 encoding) to access Google BigQuery  
 (guide for creation can be found at [pypinfo readme](https://github.com/ofek/pypinfo#installation))
+
+To encrypt `BIG_QUERY_TOKEN` use `python update.py --password`
 
 ## Running
 
@@ -29,6 +31,8 @@ python main.py --port 8080
 ```sh
 python update.py --all
 ```
+
+* `--password` - encrypt `BIG_QUERY_TOKEN` with user password
 
 * `--all` - update all databases
 * `--metadata` - update PyPI packages metadata from Google BigQuery

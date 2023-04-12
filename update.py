@@ -34,8 +34,6 @@ def _get_data_from_big_query(query: str, filename: str) -> None:
             for key, value in row_dict.items():
                 if isinstance(value, datetime):
                     row_dict[key] = str(value)
-            # add key to each dict
-            row_dict['name'] = row_dict
             f.write(json.dumps(row_dict) + '\n')
 
 

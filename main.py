@@ -194,9 +194,13 @@ async def update_github_info(packages: list[Package]) -> bool:
         github_requests.append(package)
     if not github_requests:
         return False
-    packages = await get_github_info(packages)
+    result_packages = []
+    limit = 1000
+    for i in range(0, len(packages) // limit + 1):
+        packages_batch = await get_github_info(packages[i*limit:(i+1)*limit])
+        result_packages.extend(packages_batch)
     with Session(db) as session:
-        session.bulk_save_objects(packages)
+        session.bulk_save_objects(result_packages)
         session.commit()
     return True
 

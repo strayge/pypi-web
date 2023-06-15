@@ -107,7 +107,7 @@ def encode_token() -> None:
     encoded_token = Fernet(b64encode(password_hash)).encrypt(secret_token)
     encoded_token_base64 = b64encode(encoded_token).decode()
     print('Encoded token (add it to .env file):')
-    print(f'BIG_QUERY_TOKEN="{encoded_token_base64}"')
+    print(f'BIG_QUERY_TOKEN={encoded_token_base64}')
 
 
 def decode_token() -> str:
@@ -116,7 +116,7 @@ def decode_token() -> str:
     password_hash = _hash_password(password)
     encoded_token = os.environ['BIG_QUERY_TOKEN']
     decoded_token_base64 = Fernet(b64encode(password_hash)).decrypt(b64decode(encoded_token))
-    decoded_token = b64decode(decoded_token_base64).decode()
+    decoded_token = decoded_token_base64.decode()
     return decoded_token
 
 

@@ -7,8 +7,8 @@ services:
     restart: always
     volumes:
       - ./data:/app/data
-    environment:
-      GITHUB_TOKEN: ${GITHUB_TOKEN}
+    env_file:
+      - .env
     logging:
       driver: json-file
       options:

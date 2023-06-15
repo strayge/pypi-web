@@ -32,6 +32,7 @@ class Package(BaseModel):
 
     name: Mapped[str] = mapped_column(primary_key=True)
     name_lower: Mapped[str]
+    name_normalized: Mapped[str] = mapped_column(index=True)
     version: Mapped[str]
     upload_time: Mapped[int]
     home_page: Mapped[str]
@@ -98,6 +99,7 @@ def init_data() -> None:
         package = dict(
             name=name,
             name_lower=name.lower(),
+            name_normalized=name.lower().replace('.', '-'),
             version=data['version'],
             upload_time=int(timestamp),
             home_page=homepage,
@@ -117,7 +119,7 @@ def init_data() -> None:
     print(f'insert metadata: {t2 - t1:.2f}s')
 
     update_sql = str(
-        update(Package).where(Package.name == bindparam('name')).values(
+        update(Package).where(Package.name_normalized == bindparam('name')).values(
             downloads=bindparam('download_count'),
         ).compile(),
     )

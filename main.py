@@ -195,8 +195,8 @@ async def update_github_info(packages: list[Package]) -> bool:
     if not github_requests:
         return False
     result_packages = []
-    limit = 1000
-    for i in range(0, len(packages) // limit + 1):
+    limit = 600
+    for i in range(0, (len(packages) - 1) // limit + 1):
         packages_batch = await get_github_info(packages[i*limit:(i+1)*limit])
         result_packages.extend(packages_batch)
     with Session(db) as session:

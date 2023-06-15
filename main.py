@@ -233,7 +233,7 @@ async def get_github_info(packages: list[Package]) -> list[Package]:
         github_api_url,
         headers={'Authorization': f'Bearer {token}'},
         json={'query': query},
-        timeout=15,
+        timeout=30,
     )
     assert request.status_code == 200, request.text
     assert 'data' in request.json(), f'resp: {request.json()}, query: {query}'
